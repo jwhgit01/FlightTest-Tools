@@ -51,12 +51,12 @@ vehicle_attitude = retime(vehicle_attitude(:,1),seconds(timeVec),'pchip');
 % quat 2 euler angles
 q = vehicle_attitude.q;
 qw = q(:,1); qx = q(:,2); qy = q(:,3); qz = q(:,4);
-aSinInput = -2*(qx.*qz-qw.*qy);
+aSinInput = 2*(qw.*qy-qx.*qz);
 aSinInput(aSinInput > 1) = 1;
 aSinInput(aSinInput < -1) = -1;
-eul = [ atan2( 2*(qy.*qz+qw.*qx), qw.^2 - qx.^2 - qy.^2 + qz.^2 ), ...
-        asin( aSinInput ), ...
-        atan2( 2*(qx.*qy+qw.*qz), qw.^2 + qx.^2 - qy.^2 - qz.^2 )];
+eul = [atan2( 2*(qw.*qx+qy.*qz), 1-2*(qx.^2+qy.^2) ), ...
+       asin( aSinInput ), ...
+       atan2( 2*(qw.*qz+qx.*qy), 1-2*(qy.^2+qz.^2) )];
     
 % assign outputs
 x_m = NED{:,1};

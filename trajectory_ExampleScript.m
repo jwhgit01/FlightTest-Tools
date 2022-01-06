@@ -2,8 +2,6 @@
 %
 % (C) 2021  Jeremy Hopwood <jeremyhopwood@vt.edu>
 %
-% See DOI: TODO
-%
 close all
 clear
 clc

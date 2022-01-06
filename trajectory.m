@@ -150,6 +150,7 @@ function Vnew = transformVertices(x,y,z,roll,pitch,yaw,V)
          cos(yaw)*sin(roll)-cos(roll)*sin(pitch)*sin(yaw),...
             -cos(roll)*cos(yaw)*sin(pitch)-sin(roll)*sin(yaw),...
              cos(pitch)*cos(roll)];
+
     Vnew = V*R;
     X0 = repmat([x y z], size(Vnew,1), 1);
     Vnew = Vnew + X0;
