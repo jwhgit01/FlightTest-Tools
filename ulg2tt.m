@@ -1,7 +1,7 @@
 function TT = ulg2tt(ulogPath)
 % Convert ULOG to TimeTable
 %
-% (C) 2021 Jeremy Hopwood <jeremyhopwood@vt.edu>
+% (C) 2022 Jeremy Hopwood <jeremyhopwood@vt.edu>
 %
 % Description: TODO
 %
@@ -78,7 +78,7 @@ t0_Z = duration(hour,minute,second,'Format','hh:mm:ss.SS'); % t0 in Zulu time
 % desired time step and uniform time array
 dt = 0.01; %s
 Tu = floor(T_PX4/dt)*dt;
-N = Tu/dt+1;
+N = floor(Tu/dt+1);
 Time = seconds((0:dt:Tu).');
 
 % GPS timestamps
@@ -230,11 +230,21 @@ end
 % Note: this is a custom topic that must be defined in PX4
 if any(strcmp(topicsAvail,'airdata'))
     airdata = data('airdata',:).TopicMessages{:};
+    %
+    % remove noise from alpha and beta vanes if necessary
+    %
+    k = 6; % number of neighboring data points to be used
+    fc = 1/(2*k*dt); % cutoff frequency
+    Wn = 2*dt*fc; % fraction of the Nyquist rate used for a digital filter
+    [num,den] = butter(3,Wn); % 3rd order lowpass filter
+    airdata.alpha_deg = filtfilt(num,den,double(airdata.alpha_deg));
+    airdata.beta_deg = filtfilt(num,den,double(airdata.beta_deg));
+    %
     airdata.timestamp = seconds(seconds(airdata.timestamp-t0_PX4)); % shift time
     airdata = retime(airdata(:,1:5),Time,'pchip'); % retime
     airspeed_kts = airdata.airspeed_kts;
-    alpha_deg = airdata.alpha_deg;
-    beta_deg = airdata.beta_deg;
+    alpha_deg = double(airdata.alpha_deg);
+    beta_deg = double(airdata.beta_deg);
     TT = addvars(TT,airspeed_kts,alpha_deg,beta_deg,'NewVariableNames',{'airspeed_kts','alpha_deg_measured','beta_deg_measured'}); % add to timetable
 end
 

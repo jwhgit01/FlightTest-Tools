@@ -141,17 +141,12 @@ end
 
 % transformation of aircraft patch data to ENU frame
 function Vnew = transformVertices(x,y,z,roll,pitch,yaw,V)
-    R = [cos(pitch)*sin(yaw),...
-             cos(pitch)*cos(yaw),...
-             sin(pitch);...
-        -cos(roll)*cos(yaw)-sin(pitch)*sin(roll)*sin(yaw),...
-            -cos(yaw)*sin(pitch)*sin(roll)+cos(roll)*sin(yaw),...
-             cos(pitch)*sin(roll);
-         cos(yaw)*sin(roll)-cos(roll)*sin(pitch)*sin(yaw),...
-            -cos(roll)*cos(yaw)*sin(pitch)-sin(roll)*sin(yaw),...
-             cos(pitch)*cos(roll)];
-
-    Vnew = V*R;
+    RIB = [cos(pitch)*cos(yaw),cos(yaw)*sin(pitch)*sin(roll)-cos(roll)*sin(yaw),sin(roll)*sin(yaw)+cos(roll)*cos(yaw)*sin(pitch);
+           cos(pitch)*sin(yaw),cos(roll)*cos(yaw)+sin(pitch)*sin(roll)*sin(yaw),cos(roll)*sin(pitch)*sin(yaw)-cos(yaw)*sin(roll);
+           -sin(pitch),cos(pitch)*sin(roll),cos(pitch)*cos(roll)];
+    R1 = diag([1,1,-1]); % correction before transformation to body frame
+    R2 = [0,1,0;1,0,0;0,0,-1]; % correction after transformation to body frame
+    Vnew = (R2*RIB*R1*V.').';
     X0 = repmat([x y z], size(Vnew,1), 1);
     Vnew = Vnew + X0;
 end
