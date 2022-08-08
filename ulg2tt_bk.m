@@ -29,10 +29,6 @@ end
 % read ulog file
 ulog = ulogreader(ulogPath);
 
-% logger start time
-t0_ULOG = seconds(ulog.StartTime);
-tf_ULOG = seconds(ulog.EndTime);
-
 % get/show available topics
 msg = readTopicMsgs(ulog);
 
@@ -94,47 +90,43 @@ data.Properties.RowNames = data.TopicNames;
 
 %% vehicle_gps_position and time synchronization
 
-% if available, do all of the data re-timing based on GPS time.
+% we do all of the data re-timing based on GPS time, if
+% vehicle_gps_position not available, throw error
 gpsLogical = any(strcmp(topicsAvail,'vehicle_gps_position'));
-if gpsLogical
-    
-    % get the first gps reading to get timestamps
-    vehicle_gps_position = data('vehicle_gps_position',:).TopicMessages{:};
-    t0_GPS = seconds(vehicle_gps_position.timestamp(1));
-    FlightTimeZulu = datetime(vehicle_gps_position.time_utc_usec(1),...
-        'ConvertFrom','epochtime','TicksPerSecond',1e6);
+if ~gpsLogical
 
-    % determine t0 for uniform timestamps based on first GPS reading
-    t0u_GPS = floor(t0_GPS*1/dt)*dt;
-    [HR,MI,SE] = hms(datetime(vehicle_gps_position.time_utc_usec(1:2),...
-        'ConvertFrom','epochtime','TicksPerSecond',1e6));
-    t0_Zulu = duration(HR(1),MI(1),interp1(seconds(vehicle_gps_position.timestamp(1:2)),...
-                       SE,t0u_GPS,'linear','extrap'),'Format','hh:mm:ss.SS');
-
-    % uniform time array
-    Tu = floor(tf_ULOG*(1/dt))*dt;
-    Time = seconds(t0u_GPS:dt:Tu).';
-    
-    % GPS timestamps
-    ZuluTime = (t0_Zulu:seconds(dt):(t0_Zulu+seconds(Tu-t0u_GPS))).'; % uniform GPS timestamps
-    
-    % create timetable
-    TT = timetable(Time,ZuluTime);
+    % don't do any shifting
+    t0_PX4 = 0;  
 
 else
 
-    % just use the rounded start time of the logger
-    t0u = floor(t0_ULOG*(1/dt))*dt;
-    Tu = floor(tf_ULOG*(1/dt))*dt;
-    Time = seconds(t0u:dt:Tu).';
+    % offset for t0 (not all topics logged right away)
+    t0_offset = 0.2; % s
     
-    % create timetable
-    TT = timetable(Time); 
+    % get the first gps reading to get timestamps
+    vehicle_gps_position = data('vehicle_gps_position',:).TopicMessages{:};
+    FlightTimeZulu = datetime(vehicle_gps_position.time_utc_usec(1),...
+        'ConvertFrom','epochtime','TicksPerSecond',1e6);
+    FlightTimeZulu = FlightTimeZulu + seconds(t0_offset); % t0 offset
+    t0_PX4 = vehicle_gps_position.timestamp(1) + seconds(t0_offset); % t0 in PX4 time
+    tf_PX4 = vehicle_gps_position.timestamp(end); % tf in PX4 time
+    T_PX4 = seconds(tf_PX4 - t0_PX4); % approximate flight time
+    
+    % important timestamps
+    [hour,minute,second] = hms(FlightTimeZulu);
+    t0_Z = duration(hour,minute,second,'Format','hh:mm:ss.SS'); % t0 in Zulu time
+
+    % desired time step and uniform time array
+    Tu = floor(T_PX4/dt)*dt;
+    N = floor(Tu/dt+1);
+    Time = seconds((0:dt:Tu).');
+    
+    % GPS timestamps
+    ZuluTime = (t0_Z:seconds(dt):(t0_Z+seconds(Tu))).'; % uniform GPS timestamps
+    ZuluTime.Format = 'hh:mm:ss.SS'; % change format
+    TT = timetable(Time,ZuluTime); % create timetable
 
 end
-
-% number of samples
-N = height(TT);
 
 %% vehicle_local_position
 %   NED position
@@ -149,6 +141,7 @@ if any(strcmp(topicsAvail,'vehicle_local_position'))
                                      vehicle_local_position.ref_alt(1,1)];
     end
     vehicle_local_position = vehicle_local_position(:,{'x','y','z','vx','vy','vz','ax','ay','az','heading'});
+    vehicle_local_position.timestamp = seconds(seconds(vehicle_local_position.timestamp-t0_PX4)); % shift time
     vehicle_local_position = retime(vehicle_local_position,Time,'pchip'); % retime
     TT = addvars(TT,vehicle_local_position{:,1:3},...
                     vehicle_local_position{:,4:6},...
@@ -164,6 +157,7 @@ end
 if gpsLogical
     vehicle_global_position = data('vehicle_global_position',:).TopicMessages{:};
     vehicle_global_position = vehicle_global_position(:,{'lat','lon','alt','alt_ellipsoid','terrain_alt'});
+    vehicle_global_position.timestamp = seconds(seconds(vehicle_global_position.timestamp-t0_PX4)); % shift time
     vehicle_global_position = retime(vehicle_global_position,Time,'pchip'); % retime
     LatLon_deg = [vehicle_global_position.lat, vehicle_global_position.lon];
     Alt_ft = vehicle_global_position.alt/0.3048;
@@ -178,6 +172,7 @@ end
 %   Euler Angles
 if any(strcmp(topicsAvail,'vehicle_attitude'))
     vehicle_attitude = data('vehicle_attitude',:).TopicMessages{:}; % get timetable
+    vehicle_attitude.timestamp = seconds(seconds(vehicle_attitude.timestamp-t0_PX4)); % shift time
     vehicle_attitude = retime(vehicle_attitude(:,'q'),Time,'pchip'); % retime
     R_BI = quat2dcm(vehicle_attitude.q); % rotation from NED to body frame
     [Yaw_rad,Pitch_rad,Roll_rad] = dcm2angle(R_BI,'ZYX'); % 3-2-1 euler parameterization
@@ -202,11 +197,13 @@ if any(strcmp(topicsAvail,'estimator_states'))
     
     % states and covariances
     estimator_states = data('estimator_states',:).TopicMessages{:}; % get timetable
+    estimator_states.timestamp = seconds(seconds(estimator_states.timestamp-t0_PX4)); % shift time
     estimator_states = retime(estimator_states(:,{'states','covariances'}),Time,'pchip'); % retime
     TT = addvars(TT,estimator_states.states,estimator_states.covariances,'NewVariableNames',{'EstimatorStates','EstimatorCovariance'}); % add to timetable
     
     % status (add more as needed)
     estimator_status = data('estimator_status',:).TopicMessages{:}; % get timetable
+    estimator_status.timestamp = seconds(seconds(estimator_status.timestamp-t0_PX4)); % shift time
     estimator_status = retime(estimator_status(:,{'pos_horiz_accuracy','pos_vert_accuracy'}),Time,'pchip'); % retime
     TT = addvars(TT,estimator_status{:,:},'NewVariableNames',{'pos_horiz_vert_accuracy'}); % add to timetable
 
@@ -214,6 +211,7 @@ else
     
     % TODO: add covariances and status topics
     estimator_status = data('estimator_status',:).TopicMessages{:}; % get timetable
+    estimator_status.timestamp = seconds(seconds(estimator_status.timestamp-t0_PX4)); % shift time
     estimator_status = retime(estimator_status(:,1),Time,'pchip'); % retime
     TT = addvars(TT,estimator_status.states,'NewVariableNames',{'EstimatorStates'}); % add to timetable
 
@@ -243,7 +241,9 @@ end
 %% vehicle_angular_velocity
 if any(strcmp(topicsAvail,'vehicle_angular_velocity'))
     vehicle_angular_velocity = data('vehicle_angular_velocity',:).TopicMessages{:};
-    vehicle_angular_velocity = retime(vehicle_angular_velocity(:,'xyz'),Time,'pchip'); % retime
+    gyroTimeShift = vehicle_angular_velocity.timestamp(1)-vehicle_angular_velocity.timestamp_sample(1); % gyro time shift
+    vehicle_angular_velocity.timestamp = seconds(seconds((vehicle_angular_velocity.timestamp-gyroTimeShift)-t0_PX4)); % shift time
+    vehicle_angular_velocity = retime(vehicle_angular_velocity(:,2),Time,'pchip'); % retime
     TT = addvars(TT,vehicle_angular_velocity.xyz*180/pi,'NewVariableNames',{'omega_deg_s'}); % add to timetable
 end
 
@@ -267,6 +267,7 @@ end
 %% sensor_combined
 if any(strcmp(topicsAvail,'sensor_combined'))
     sensor_combined = data('sensor_combined',:).TopicMessages{:};
+    sensor_combined.timestamp = seconds(seconds(sensor_combined.timestamp-t0_PX4)); % shift time
     sensor_combined = retime(sensor_combined(:,[1 4]),Time,'pchip'); % retime
     gyro_rad_s = sensor_combined.gyro_rad;
     accel_m_s2 = sensor_combined.accelerometer_m_s2;
@@ -276,6 +277,7 @@ end
 %% input_rc
 if any(strcmp(topicsAvail,'input_rc'))
     input_rc = data('input_rc',:).TopicMessages{:};
+    input_rc.timestamp = seconds(seconds(input_rc.timestamp-t0_PX4)); % shift time
     input_rc = retime(input_rc(:,'values'),Time,'nearest'); % retime
     TT = addvars(TT,input_rc.values,'NewVariableNames',{'input_rc_PWM'}); % add to timetable
 end
@@ -283,51 +285,37 @@ end
 %% actuator_controls
 if any(strcmp(topicsAvail,'actuator_controls_0'))
     actuator_controls = data('actuator_controls_0',:).TopicMessages{:};
+    actuator_controls.timestamp = seconds(seconds(actuator_controls.timestamp-t0_PX4)); % shift time
     actuator_controls = retime(actuator_controls(:,'control'),Time,'nearest'); % retime
-    act_controls_normalized = actuator_controls.control;
-    TT = addvars(TT,act_controls_normalized,'NewVariableNames',{'actuator_controls'}); % add to timetable
+    act_controls_PWM = actuator_controls.control;
+    TT = addvars(TT,act_controls_PWM,'NewVariableNames',{'act_controls_PWM'}); % add to timetable
 end
 
 %% actuator_outputs
 if num_actuator_outputs > 0
-
-    % determine the size of the array for efficiency
-    nouts = zeros(1,num_actuator_outputs);
-    for ii = 1:num_actuator_outputs
-        if ii == 1
-            nouts(ii) = size(data('actuator_outputs',:).TopicMessages{:}.output,2);
-        else
-            nouts(ii) = size(data(['actuator_outputs_' num2str(ii-1)],:).TopicMessages{:}.output,2);
-        end
-    end
-    actuator_outputs_array = zeros(N,sum(nouts));
-    % although, consider not storing so many zeros...
-
-    % populate it
+    actuator_outputs_array = [];
     for ii = 1:num_actuator_outputs
         if ii == 1
             actuator_outputs = data('actuator_outputs',:).TopicMessages{:};
-            actuator_outputs = retime(actuator_outputs(:,'output'),Time,'nearest'); % retime
-            actuator_outputs_array(:,1:nouts(ii)) = actuator_outputs.output;
         else
             actuator_outputs = data(['actuator_outputs_' num2str(ii-1)],:).TopicMessages{:};
-            actuator_outputs = retime(actuator_outputs(:,'output'),Time,'nearest'); % retime
-            actuator_outputs_array(:,sum(nouts(1:ii-1))+1:sum(nouts(1:ii))) = actuator_outputs.output;
         end
+        actuator_outputs.timestamp = seconds(seconds(actuator_outputs.timestamp-t0_PX4)); % shift time
+        actuator_outputs = retime(actuator_outputs(:,'output'),Time,'nearest'); % retime
+        actuator_outputs_array = [actuator_outputs_array, actuator_outputs.output]; % concatenate with previous instances
     end
 
     % general aircraft
-    TT = addvars(TT,actuator_outputs_array,'NewVariableNames','actuator_outputs_RAW'); % add to timetable
-    % units depend on the output (i.e. SERVO, UAVCAN ESC, DSHOT ESC, etc.)
+    TT = addvars(TT,actuator_outputs_array,'NewVariableNames','ActuatorOutputs_PWM'); % add to timetable
     
     % fixed wing
-    % TODO: How do we know which?
     % TT = addvars(TT,actuator_outputs.output(:,[1 2 4]),actuator_outputs.output(:,3),'NewVariableNames',{'deltaPWM_us','ThrottlePWM_us'}); % add to timetable
 end
 
-%% vehicle_control_modes
+%% vehicl_control_modes
 if any(strcmp(topicsAvail,'vehicle_control_mode'))
     vehicle_control_mode = data('vehicle_control_mode',:).TopicMessages{:};
+    vehicle_control_mode.timestamp = seconds(seconds(vehicle_control_mode.timestamp-t0_PX4)); % shift time
     vehicle_control_mode = retime(vehicle_control_mode,Time,'nearest'); % retime
     TT = addvars(TT,vehicle_control_mode,'NewVariableNames',{'vehicle_control_mode'}); % add to timetable
 end
@@ -342,22 +330,20 @@ if any(strcmp(topicsAvail,'airspeed_validated'))
             airspeed_validated{k,:} = nan(size(airspeed_validated{k,:}));
         end
     end
-    %
-    % TODO: change from number idx to name
-    %
-    airspeed_validated = retime(airspeed_validated(:,1:5),Time,'pchip'); % retime 
+    airspeed_validated.timestamp = seconds(seconds(airspeed_validated.timestamp-t0_PX4)); % shift time
+    airspeed_validated = retime(airspeed_validated(:,1:5),Time,'pchip'); % retime TODO: change from number idx to name
     EAS_m_s = double(airspeed_validated.equivalent_airspeed_m_s);
     TAS_m_s = double(airspeed_validated.true_airspeed_m_s);
     TT = addvars(TT,EAS_m_s,TAS_m_s,'NewVariableNames',{'EquivalentAirSpeed_m_s','TrueAirSpeed_m_s'}); % add to timetable
 end
      
 %% airdata
-%   measured alpha, beta, V from an air data unit
+%   measured alpha, beta, V from a vaned air data unit
 % Note: this is a custom topic that must be defined in PX4
 if any(strcmp(topicsAvail,'airdata'))
     airdata = data('airdata',:).TopicMessages{:};
     %
-    % remove noise from alpha and beta vanes before re-timing
+    % remove noise from alpha and beta vanes if necessary
     %
     k = 5; % number of neighboring data points to be used
     fc = 1/(2*k*dt); % cutoff frequency
@@ -366,8 +352,7 @@ if any(strcmp(topicsAvail,'airdata'))
     airdata.alpha_deg = filtfilt(num,den,double(airdata.alpha_deg));
     airdata.beta_deg = filtfilt(num,den,double(airdata.beta_deg));
     %
-    % TODO: consider filter freq based on raw data sample time
-    %
+    airdata.timestamp = seconds(seconds(airdata.timestamp-t0_PX4)); % shift time
     airdata = retime(airdata(:,1:5),Time,'pchip'); % retime
     airspeed_kias = airdata.airspeed_kts;
     alpha_deg = double(airdata.alpha_deg);
@@ -378,44 +363,27 @@ end
 %% rpm
 if any(strcmp(topicsAvail,'rpm'))
     rpm = data('rpm',:).TopicMessages{:};
+    rpm.timestamp = seconds(seconds(rpm.timestamp-t0_PX4)); % shift time
     rpm = retime(rpm(:,1),Time,'pchip'); % retime
     TT = addvars(TT,double(rpm.indicated_frequency_rpm),'NewVariableNames',{'rpm_indicated'}); % add to timetable
 end
 
 %% esc_status
 if any(strcmp(topicsAvail,'esc_status'))
-    
     esc_status = data('esc_status',:).TopicMessages{:};
+    esc_count = esc_status.esc_count(1,1);
     
-    % TODO:see how this works for non-UAVCAN ESCs
-    % if esc_type = rpm_meas
-        
-        % get number of ESCs
-        esc_count = esc_status.esc_count(1,1);
-        
-        % loop through number of ESCs
-        esc_rpm = zeros(N,esc_count);
-        for ii = 1:esc_count
+    % TODO: see how this works for non-UAVCAN ESCs
     
-            % rpm measurement and timestamp
-            ti = double(esc_status.(['esc[' num2str(ii-1) '].timestamp']))/1e6;
-            ni = double(esc_status.(['esc[' num2str(ii-1) '].esc_rpm']));
-    
-            % remove leading and trailing rows with zero
-            idx0 = find(ni~=0,1,'first');
-            idx1 = find(ni~=0,1,'last');
-            ti = ti(idx0:idx1);
-            ni = ni(idx0:idx1);
-    
-            % temporary timetable
-            TT_temp = retime(timetable(seconds(ti),ni),Time,'pchip','EndValues',0);
-            esc_rpm(:,ii) = TT_temp.ni;
-        end
-    
-        % add to timetable
-        TT = addvars(TT,esc_rpm,'NewVariableNames',{'esc_rpm'}); % add to timetable
+    % loop through number of ESCs
+    for ii = 1:esc_count
+        ti = double(esc_status.(['esc[' num2str(ii-1) '].timestamp']))/1e6-seconds(t0_PX4);
+        ni = esc_status.(['esc[' num2str(ii-1) '].esc_rpm']);
+    end
 
-    % end
+%     rpm.timestamp = seconds(seconds(rpm.timestamp-t0_PX4)); % shift time
+%     rpm = retime(rpm(:,1),Time,'pchip'); % retime
+%     TT = addvars(TT,double(rpm.indicated_frequency_rpm),'NewVariableNames',{'rpm_indicated'}); % add to timetable
 end
 
 %% Metadata and Save to mat File
