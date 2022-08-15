@@ -400,18 +400,16 @@ if any(strcmp(topicsAvail,'esc_status'))
         for ii = 1:esc_count
     
             % rpm measurement and timestamp
-            ti = double(esc_status.(['esc[' num2str(ii-1) '].timestamp']))/1e6;
             ni = double(esc_status.(['esc[' num2str(ii-1) '].esc_rpm']));
-    
-            % remove leading and trailing rows with zero
-            idx0 = find(ni~=0,1,'first');
-            idx1 = find(ni~=0,1,'last');
-            ti = ti(idx0:idx1);
-            ni = ni(idx0:idx1);
+            
+            % remove duplicate timestamp values and keep first sample
+            [ti,ia,~] = unique(esc_status.(['esc[' num2str(ii-1) '].timestamp']),'first');
+            tidd = double(ti)/1e6;
+            nidd = ni(ia);
     
             % temporary timetable
-            TT_temp = retime(timetable(seconds(ti),ni),Time,'pchip','EndValues',0);
-            esc_rpm(:,ii) = TT_temp.ni;
+            TT_temp = retime(timetable(seconds(tidd),nidd),Time,'pchip','EndValues',0);
+            esc_rpm(:,ii) = TT_temp.nidd;
         end
     
         % add to timetable
