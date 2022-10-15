@@ -25,7 +25,6 @@ function TT = ulg2tt(ulogPath,dt)
 if nargin < 2
     dt = 0.01; %s
 end
-% dt_status = 0.1; TODO: slower rate for status messages?
 
 % read ulog file
 ulog = ulogreader(ulogPath);
@@ -72,7 +71,6 @@ topicsAvail = intersect(topicList,msg.TopicNames);
 
 % read the topic messages and make the table accessible by row name
 data = readTopicMsgs(ulog,'TopicNames',topicsAvail);
-%                      'InstanceID',num2cell(zeros(size(topicsAvail))));
 
 % find "duplicate" topic names and append instance to name
 num_actuator_outputs = 0;
@@ -214,10 +212,10 @@ if any(strcmp(topicsAvail,'estimator_states'))
 
 else
     
-    % TODO: add covariances and status topics
+    % TODO: add status topics
     estimator_status = data('estimator_status',:).TopicMessages{:}; % get timetable
-    estimator_status = retime(estimator_status(:,1),Time,'pchip'); % retime
-    TT = addvars(TT,estimator_status.states,'NewVariableNames',{'EstimatorStates'}); % add to timetable
+    estimator_status = retime(estimator_status(:,{'states','covariances'}),Time,'pchip'); % retime
+    TT = addvars(TT,estimator_status.states,estimator_status.covariances,'NewVariableNames',{'EstimatorStates','EstimatorCovariance'}); % add to timetable
 
 end
 
