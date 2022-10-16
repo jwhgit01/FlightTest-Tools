@@ -181,8 +181,8 @@ if any(strcmp(topicsAvail,'vehicle_attitude'))
     vehicle_attitude = retime(vehicle_attitude(:,'q'),Time,'pchip'); % retime
     R_BI = quat2dcm(vehicle_attitude.q); % rotation from NED to body frame
     [Yaw_rad,Pitch_rad,Roll_rad] = dcm2angle(R_BI,'ZYX'); % 3-2-1 euler parameterization
-    EulerAngles_deg = [Roll_rad,Pitch_rad,Yaw_rad]*180/pi; % euler angles in degrees
-    TT = addvars(TT,EulerAngles_deg,permute(R_BI,[3,1,2]),'NewVariableNames',{'EulerAngles_deg','R_BI'}); % add to timetable
+    EulerAngles_rad = [Roll_rad,Pitch_rad,Yaw_rad]; % euler angles in degrees
+    TT = addvars(TT,EulerAngles_rad,permute(R_BI,[3,1,2]),'NewVariableNames',{'EulerAngles_deg','R_BI'}); % add to timetable
 end
 
 %% estimator_status and/or estimator_states
@@ -219,6 +219,13 @@ else
 
 end
 
+%% Vehicle Air Data
+if any(strcmp(topicsAvail,'vehicle_air_data'))
+    vehicle_air_data = data('vehicle_air_data',:).TopicMessages{:};
+    vehicle_air_data = retime(vehicle_air_data(:,{'baro_alt_meter','baro_temp_celcius','baro_pressure_pa','rho'}),Time,'pchip'); % retime
+    TT = addvars(TT,vehicle_air_data.rho,'NewVariableNames',{'rho_kg_m3'}); % add to timetable
+end
+
 %% Derived Air Data
 % From vehicle_attitude and vehicle_local_position we can compute
 %   velocity and acceleration in body frame
@@ -244,7 +251,7 @@ end
 if any(strcmp(topicsAvail,'vehicle_angular_velocity'))
     vehicle_angular_velocity = data('vehicle_angular_velocity',:).TopicMessages{:};
     vehicle_angular_velocity = retime(vehicle_angular_velocity(:,'xyz'),Time,'pchip'); % retime
-    TT = addvars(TT,vehicle_angular_velocity.xyz*180/pi,'NewVariableNames',{'omega_deg_s'}); % add to timetable
+    TT = addvars(TT,vehicle_angular_velocity.xyz,'NewVariableNames',{'omega_rad_s'}); % add to timetable
 end
 
 %% Unwrapped yaw
