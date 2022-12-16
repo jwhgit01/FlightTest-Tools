@@ -9,14 +9,21 @@ close all
 clear
 clc
 
-% convert ulog file to a timedatble
+% convert ulog file to a timetable
 ulogPath = '../../20211116/20211116_CZ1501_Flt4.ulg';
 data = ulg2tt(ulogPath);
+
+% custom options
+opts = ulg2ttOptions;
+opts.MessageSet = 'Debugging'
+opts.TimeStep = 0.2;
+opts.Plot = true;
+data = ulg2tt(ulogPath,ulg2ttOptions);
 
 % save the timetable in a .mat file in same location as the ulog
 [filepath,filename,~] = fileparts(ulogPath);
 MATfilename = [filepath '/' filename '.mat'];
-save(MATfilename,'data');
+% save(MATfilename,'data');
 
 % Get properties of the data. For example,
 data.Properties
