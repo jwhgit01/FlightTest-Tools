@@ -5,11 +5,11 @@ classdef ulg2ttOptions
     %
     % The MessageSet property defines set of messages that are returned in
     % a timetable. The options are 'Debugging', 'Basic', 'Standard',
-    % 'Advanced', and 'SystemIdentification', although more may be added.
+    % 'Advanced', and 'Estimation', although more may be added.
     %
     % The TimeStep property is specified as a numeric value in seconds.
     % However, the TimeStep property is ignored if the MessageSet is
-    % 'SystemIdentification'.
+    % 'Estimation'.
     %
     % The Plot propery is either a logical value indicating whether plots
     % are to be produced or a specific variabe name in the resulting

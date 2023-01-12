@@ -110,7 +110,7 @@ elseif strcmp(MessageSet,'Advanced')
     DataLevel = 3;
     DebugLevel = 2;
     Time = seconds(t0_ULOG:dt:tf_ULOG).';
-elseif strcmp(MessageSet,'SystemIdentification')
+elseif strcmp(MessageSet,'Estimation')
     DataLevel = 3;
     DebugLevel = 0;
     if any(strcmp(topicsAvail,'sensor_combined'))
@@ -246,10 +246,10 @@ if any(strcmp(topicsAvail,'vehicle_local_position'))
     vehicle_local_position = retime(vehicle_local_position,Time,'pchip');
     NED_m = double([vehicle_local_position.x,vehicle_local_position.y,vehicle_local_position.z]);
     vi_m_s = double([vehicle_local_position.vx,vehicle_local_position.vy,vehicle_local_position.vz]);
-    ai_m_s = double([vehicle_local_position.ax,vehicle_local_position.ay,vehicle_local_position.az]);
+    ai_m_s2 = double([vehicle_local_position.ax,vehicle_local_position.ay,vehicle_local_position.az]);
     heading_rad = double(vehicle_local_position.heading);
-    data = addvars(data,NED_m,vi_m_s,ai_m_s,heading_rad);
-    clear NED_m vi_m_s ai_m_s heading_rad
+    data = addvars(data,NED_m,vi_m_s,ai_m_s2,heading_rad);
+    clear NED_m vi_m_s ai_m_s2 heading_rad
 end 
 
 % vehicle_attitude
@@ -269,19 +269,22 @@ if any(strcmp(topicsAvail,'vehicle_attitude')) && any(strcmp(topicsAvail,'vehicl
     timestamp = vehicle_attitude.timestamp;
     temp = retime(vehicle_local_position,timestamp,'pchip');
     vi_m_s = double([temp.vx, temp.vy, temp.vz]);
+    ai_m_s2 = double([temp.ax, temp.ay, temp.az]);
     N = size(R_BI,3);
     vb_m_s = zeros(N,3);
+    ab_m_s2 = zeros(N,3);
     alpha_deg_derived = zeros(N,1);
     beta_deg_derived = zeros(N,1);
     V_m_s_derived = zeros(N,1);
     for k = 1:N % loop through timetable
         vb_m_s(k,:) = ((R_BI(:,:,k))*(vi_m_s(k,:).')).'; % body velocity
+        ab_m_s2(k,:) = ((R_BI(:,:,k))*(ai_m_s2(k,:).')).'; % inertial acceleration in body frame
         V_m_s_derived(k,1) = norm(vi_m_s(k,:)); % derived airspeed (m/s)
         alpha_deg_derived(k,1) = atan2d(vb_m_s(k,3),vb_m_s(k,1)); % angle of attack (deg)
         beta_deg_derived(k,1) = asind(vb_m_s(k,2)/V_m_s_derived(k,1)); % sideslip (deg)
     end
-    data = addvars(data,vb_m_s,V_m_s_derived,alpha_deg_derived,beta_deg_derived);
-    clear vehicle_attitude vehicle_local_position R_BI
+    data = addvars(data,vb_m_s,ab_m_s2,V_m_s_derived,alpha_deg_derived,beta_deg_derived);
+    clear vehicle_attitude vehicle_local_position R_BI vi_m_s ai_m_s2
 end
 
 % vehicle_angular_velocity
