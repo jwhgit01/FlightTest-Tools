@@ -259,8 +259,19 @@ if any(strcmp(topicsAvail,'vehicle_attitude'))
     R_BI = quat2dcm(vehicle_attitude.q); % rotation from NED to body frame
     [Yaw_rad,Pitch_rad,Roll_rad] = dcm2angle(R_BI,'ZYX'); % 3-2-1 euler parameterization
     EulerAngles_rad = [Roll_rad,Pitch_rad,Yaw_rad]; % euler angles
+    Yaw_unwrapped_rad = Yaw_rad;
+    wrap_counter = 0;
+    for k = 2:length(Yaw_rad) 
+        if Yaw_rad(k) - Yaw_rad(k-1) > pi
+            wrap_counter = wrap_counter - 1;
+        end
+        if Yaw_rad(k) - Yaw_rad(k-1) < -pi
+            wrap_counter = wrap_counter + 1;
+        end
+        Yaw_unwrapped_rad(k) = Yaw_rad(k) + 2*pi*wrap_counter;
+    end
     data = addvars(data,EulerAngles_rad,permute(R_BI,[3,1,2]),...
-        'NewVariableNames',{'EulerAngles_rad','R_BI'});
+        Yaw_unwrapped_rad,'NewVariableNames',{'EulerAngles_rad','R_BI','Yaw_unwrapped_rad'});
     clear Yaw_rad Pitch_rad Roll_rad EulerAngles_rad
 end
 
@@ -414,6 +425,7 @@ if DataLevel > 2
     % rpm
     if any(strcmp(topicsAvail,'rpm'))
         rpm = msg('rpm',:).TopicMessages{:}(:,'indicated_frequency_rpm');
+        rpm = rmoutliers(rpm);
         rpm = retime(rpm,Time,'pchip');
         data = addvars(data,rpm.indicated_frequency_rpm,'NewVariableNames','indicated_rpm');
         clear rpm
