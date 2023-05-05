@@ -5,9 +5,13 @@ function animateObject(translations,rotations,scaleFactor,vidObj,stl)
 %
 % This function ...
 %
+% Requirements: UAV Toolbox
+%
 % Inputs:
 %
-%   in1     The first input...
+%   translations  See documentation for plotTransforms.m
+%
+%   rotations     See documentation for plotTransforms.m
 %  
 % Outputs:
 %
