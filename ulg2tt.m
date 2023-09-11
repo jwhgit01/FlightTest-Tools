@@ -112,7 +112,7 @@ elseif strcmp(MessageSet,'Advanced')
     Time = seconds(t0_ULOG:dt:tf_ULOG).';
 elseif strcmp(MessageSet,'Estimation')
     DataLevel = 3;
-    DebugLevel = 0;
+    DebugLevel = 1;
     if any(strcmp(topicsAvail,'sensor_combined'))
         t_raw = seconds(msg('sensor_combined',:).TopicMessages{:}.timestamp);
         dt = median(diff(t_raw));
@@ -483,17 +483,20 @@ if DataLevel > 2
             {'states','covariances'});
         
         % Status (add more as needed)
-        estimator_status = msg('estimator_status',:).TopicMessages{:}(:,...
-            {'pos_horiz_accuracy','pos_vert_accuracy'});
+        if any(strcmp(topicsAvail,'estimator_status'))
+            estimator_status = msg('estimator_status',:).TopicMessages{:}(:,...
+                {'pos_horiz_accuracy','pos_vert_accuracy'});
+            estimator_status = retime(estimator_status,Time,'pchip');
+            data = addvars(data,estimator_status.pos_horiz_accuracy,estimator_status.pos_vert_accuracy,...
+                'NewVariableNames',{'pos_horiz_accuracy','pos_vert_accuracy'});
+            clear estimator_status
+        end
     
         % add to timetable
         estimator_states = retime(estimator_states,Time,'pchip');
-        estimator_status = retime(estimator_status,Time,'pchip');
         data = addvars(data,estimator_states.states,estimator_states.covariances,...
-            estimator_status.pos_horiz_accuracy,estimator_status.pos_vert_accuracy,...
-            'NewVariableNames',{'estimator_states','estimator_covariances',...
-            'pos_horiz_accuracy','pos_vert_accuracy'});
-        clear estimator_states estimator_status
+            'NewVariableNames',{'estimator_states','estimator_covariances'});
+        clear estimator_states
     
     elseif any(strcmp(topicsAvail,'estimator_status')) % v1.11.3 and earlier
         
@@ -589,6 +592,9 @@ end
 
 %% Debugging Topics
 % vehicle_control_mode
+% vehicle_rates_setpoint
+% vehicle_attitude_setpoint
+% vehicle_local_position_setpoint
 % vehicle_status
 % vehicle_status_flags
 
@@ -597,9 +603,57 @@ if DebugLevel > 0
     % vehicle_control_mode
     if any(strcmp(topicsAvail,'vehicle_control_mode'))
         vehicle_control_mode = msg('vehicle_control_mode',:).TopicMessages{:};
-        vehicle_control_mode = retime(vehicle_control_mode,Time,'nearest');
+        vehicle_control_mode = retime(vehicle_control_mode,Time,'previous');
         data = addvars(data,vehicle_control_mode);
         clear vehicle_control_mode
+    end
+
+    % vehicle_thrust_setpoint
+    if any(strcmp(topicsAvail,'vehicle_thrust_setpoint'))
+        vehicle_thrust_setpoint = msg('vehicle_thrust_setpoint',:).TopicMessages{:};
+        ts = vehicle_thrust_setpoint.timestamp_sample;
+        Td = -double(vehicle_thrust_setpoint.xyz(:,3));
+        Td = interp1(ts,Td,Time,'previous',0);
+        data = addvars(data,Td,'NewVariableNames','thrust_setpoint');
+        clear ts Td vehicle_thrust_setpoint
+    end
+
+    % vehicle_torque_setpoint
+    if any(strcmp(topicsAvail,'vehicle_torque_setpoint'))
+        vehicle_torque_setpoint = msg('vehicle_torque_setpoint',:).TopicMessages{:};
+        ts = vehicle_torque_setpoint.timestamp_sample;
+        taud = double(vehicle_torque_setpoint.xyz);
+        taud = interp1(ts,taud,Time,'previous',0);
+        data = addvars(data,taud,'NewVariableNames','torque_setpoint');
+        clear ts taud vehicle_torque_setpoint
+    end
+
+    % vehicle_rates_setpoint
+    if any(strcmp(topicsAvail,'vehicle_rates_setpoint'))
+        vehicle_rates_setpoint = msg('vehicle_rates_setpoint',:).TopicMessages{:};
+        vehicle_rates_setpoint = retime(vehicle_rates_setpoint,Time,'previous');
+        omega_setpoint_rad_s = double(vehicle_rates_setpoint{:,["roll","pitch","yaw"]});
+        data = addvars(data,omega_setpoint_rad_s);
+        clear vehicle_rates_setpoint omega_setpoint_rad_s
+    end
+
+    % vehicle_attitude_setpoint
+    if any(strcmp(topicsAvail,'vehicle_attitude_setpoint'))
+        vehicle_attitude_setpoint = msg('vehicle_attitude_setpoint',:).TopicMessages{:};
+        vehicle_attitude_setpoint = retime(vehicle_attitude_setpoint,Time,'previous');
+        EulerAngles_setpoint_rad = double(vehicle_attitude_setpoint{:,["roll_body","pitch_body","yaw_body"]});
+        data = addvars(data,EulerAngles_setpoint_rad);
+        clear vehicle_attitude_setpoint EulerAngles_setpoint_rad
+    end
+
+    % vehicle_local_position_setpoint
+    if any(strcmp(topicsAvail,'vehicle_local_position_setpoint'))
+        vehicle_local_position_setpoint = msg('vehicle_local_position_setpoint',:).TopicMessages{:};
+        vehicle_local_position_setpoint = retime(vehicle_local_position_setpoint(:,["x","y","z","vx","vy","vz"]),Time,'previous');
+        NED_setpoint_m = double(vehicle_local_position_setpoint{:,["x","y","z"]});
+        vi_setpoint_m_s = double(vehicle_local_position_setpoint{:,["vx","vy","vz"]});
+        data = addvars(data,NED_setpoint_m,vi_setpoint_m_s);
+        clear vehicle_local_position_setpoint NED_setpoint_m vi_setpoint_m_s
     end
 
 end

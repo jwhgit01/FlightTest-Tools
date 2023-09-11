@@ -56,9 +56,11 @@ daspect([1 1 1]);
 lightangle(35,60)
 
 % if video, open and get and write first frame
-open(vidObj);
 frame = getframe(fig);
-writeVideo(vidObj,frame);
+if ~isempty(vidObj)
+    open(vidObj);
+    writeVideo(vidObj,frame);
+end
 delete(ax.Children(2));
 
 % color of path
@@ -74,7 +76,9 @@ for ii = 2:N
     % if we are making a video
     ax = plotTransforms(ENU(ii,:),rotations(ii,:),'MeshFilePath',stl,'FrameSize',scaleFactor);
     frame = getframe(fig);
-    writeVideo(vidObj,frame);
+    if ~isempty(vidObj)
+        writeVideo(vidObj,frame);
+    end
     if ii < N
         delete(ax.Children(1));
     end
@@ -82,7 +86,9 @@ for ii = 2:N
 end
 
 % if video, close object
-close(vidObj);
+if ~isempty(vidObj)
+    close(vidObj);
+end
 
 
 end
