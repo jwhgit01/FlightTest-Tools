@@ -1,22 +1,21 @@
 function [x_m,y_m,z_m,roll_rad,pitch_rad,yaw_rad,t_s] = ulg2pose(ulogPath,timeVec)
+%ulg2pose
 %
 % (C) 2021 Jeremy Hopwood <jeremyhopwood@vt.edu>
 %
-% Description: TODO
+% This function obtains position and attitude data from a ULOG file.
 %
 % Matlab Requirements:  Matlab R2020b or newer
 %                       UAV Toolbox
-%
-% PX4 Requirements: Any pixhawk with the PX4 EKF
 %
 % Inputs:
 %   ulogPath  filepath to .ulg file
 %   timeVec   array of PX4 timestamps at which to return data (optional)
 % 
 % Outputs:
-%   x_m, y_m, z_m   North,East,Down position in meters
-%   roll_rad,pitch_rad,yaw_rad    Euler angles in radians
-%   t_s time vector in seconds (optional)
+%   x_m, y_m, z_m               North,East,Down position in meters
+%   roll_rad,pitch_rad,yaw_rad  Euler angles in radians
+%   t_s                         time vector in seconds
 
 % required topics
 topics = {'vehicle_local_position','vehicle_attitude'};

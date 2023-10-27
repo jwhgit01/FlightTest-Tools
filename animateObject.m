@@ -1,9 +1,16 @@
 function animateObject(translations,rotations,scaleFactor,vidObj,stl)
-%untitled 
+%animateObject 
 %
 % Copyright (c) 2023 Jeremy W. Hopwood. All rights reserved.
 %
-% This function ...
+% This function animates the trajectory of a rigid body. 
+%
+% Example usage:
+%   fig = figure;
+%   fig.Position(3:4) = [1080 1080]); % resolution
+%   vidObj = VideoWriter('myAnimation.mp4','MPEG-4');
+%   vidObj.FrameRate = 1/dt; % real-time
+%   animateObject(translations,rotations,1,vidObj,'quad.stl')
 %
 % Requirements: UAV Toolbox
 %
@@ -13,9 +20,12 @@ function animateObject(translations,rotations,scaleFactor,vidObj,stl)
 %
 %   rotations     See documentation for plotTransforms.m
 %  
-% Outputs:
+%   scaleFactor   A scale factor that determines how large the 3D object
+%                 defined by the input 'stl' is displayed.
 %
-%   out1    The first output...
+%   vidObj        The number of 3D objects to plot along the path.
+%
+%   stl           The filename of an STL file that defines the 3D object.
 %
 
 

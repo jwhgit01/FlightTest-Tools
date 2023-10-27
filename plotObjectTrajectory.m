@@ -1,8 +1,10 @@
 function plotObjectTrajectory(translations,rotations,scaleFactor,numObjects,stl)
+%plotObjectTrajectory
 %
 % Copyright (c) 2023 Jeremy W. Hopwood. All rights reserved.
 %
-% This function ...
+% This function plots the trajectory of a rigid body. It displays the path
+% as well as a number of 3D models depicting attitude.
 %
 % Requirements: UAV Toolbox
 %
@@ -11,6 +13,14 @@ function plotObjectTrajectory(translations,rotations,scaleFactor,numObjects,stl)
 %   translations  See documentation for plotTransforms.m
 %
 %   rotations     See documentation for plotTransforms.m
+%
+%   scaleFactor   A scale factor that determines how large the 3D object
+%                 defined by the input 'stl' is displayed.
+%
+%   numObjects    The number of 3D objects to plot along the path.
+%
+%   stl           The filename of an STL file that defines the 3D object.
+%
 %
 
 % input arguments error checking
@@ -62,3 +72,5 @@ grid on
 view(35,25);
 daspect([1 1 1]);
 lightangle(35,60)
+
+end
