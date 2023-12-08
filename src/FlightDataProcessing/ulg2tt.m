@@ -114,7 +114,7 @@ elseif strcmp(MessageSet,'Estimation')
     DataLevel = 3;
     DebugLevel = 1;
     if any(strcmp(topicsAvail,'sensor_combined'))
-        t_raw = seconds(msg('sensor_combined',:).TopicMessages{:}.timestamp);
+        t_raw = seconds(msg('sensor_combined',:).TopicMessages{1}.timestamp);
         dt = median(diff(t_raw));
         Time = seconds(t0_ULOG:dt:tf_ULOG).';
     else
@@ -165,19 +165,19 @@ sensor_gps_avail = any(strcmp(topicsAvail,'sensor_gps'));
 vehicle_global_position_avail = any(strcmp(topicsAvail,'vehicle_global_position'));
 vehicle_gps_position_avail = any(strcmp(topicsAvail,'vehicle_gps_position'));
 if sensor_gps_avail
-    sensor_gps = msg('sensor_gps',:).TopicMessages{:}(:,{'time_utc_usec',...
+    sensor_gps = msg('sensor_gps',:).TopicMessages{1}(:,{'time_utc_usec',...
         'lat','lon','alt','alt_ellipsoid','s_variance_m_s','eph','epv',...
         'vel_n_m_s','vel_e_m_s','vel_d_m_s'});
     gps_avail = true;
     utc_avail = true;
 elseif vehicle_gps_position_avail
-    sensor_gps = msg('vehicle_gps_position',:).TopicMessages{:}(:,{'time_utc_usec',...
+    sensor_gps = msg('vehicle_gps_position',:).TopicMessages{1}(:,{'time_utc_usec',...
         'lat','lon','alt','alt_ellipsoid','s_variance_m_s','eph','epv',...
         'vel_n_m_s','vel_e_m_s','vel_d_m_s'});
     gps_avail = true;
     utc_avail = true;
 elseif vehicle_global_position_avail
-    sensor_gps = msg('vehicle_global_position',:).TopicMessages{:}(:,{'lat',...
+    sensor_gps = msg('vehicle_global_position',:).TopicMessages{1}(:,{'lat',...
         'lon','alt','alt_ellipsoid','eph','epv'});
     gps_avail = true;
     utc_avail = false;
@@ -234,7 +234,7 @@ end
 
 % vehicle_local_position
 if any(strcmp(topicsAvail,'vehicle_local_position'))
-    vehicle_local_position = msg('vehicle_local_position',:).TopicMessages{:};
+    vehicle_local_position = msg('vehicle_local_position',:).TopicMessages{1};
     if gps_avail
         home_position_alt_lat_lon = [vehicle_local_position.ref_alt(1,1),...
                                      vehicle_local_position.ref_lat(1,1),...
@@ -254,7 +254,7 @@ end
 
 % vehicle_attitude
 if any(strcmp(topicsAvail,'vehicle_attitude'))
-    vehicle_attitude = msg('vehicle_attitude',:).TopicMessages{:}(:,'q');
+    vehicle_attitude = msg('vehicle_attitude',:).TopicMessages{1}(:,'q');
     vehicle_attitude = retime(vehicle_attitude,Time,'pchip');
     R_BI = quat2dcm(vehicle_attitude.q); % rotation from NED to body frame
     [Yaw_rad,Pitch_rad,Roll_rad] = dcm2angle(R_BI,'ZYX'); % 3-2-1 euler parameterization
@@ -300,7 +300,7 @@ end
 
 % vehicle_angular_velocity
 if any(strcmp(topicsAvail,'vehicle_angular_velocity'))
-    vehicle_angular_velocity = msg('vehicle_angular_velocity',:).TopicMessages{:};
+    vehicle_angular_velocity = msg('vehicle_angular_velocity',:).TopicMessages{1};
     vehicle_angular_velocity = retime(vehicle_angular_velocity,Time,'pchip');
     data = addvars(data,vehicle_angular_velocity.xyz,'NewVariableNames','omega_rad_s');
     clear vehicle_angular_velocity
@@ -308,7 +308,7 @@ end
 
 % airspeed_validated
 if any(strcmp(topicsAvail,'airspeed_validated'))
-    airspeed_validated = msg('airspeed_validated',:).TopicMessages{:};
+    airspeed_validated = msg('airspeed_validated',:).TopicMessages{1};
     airspeed_validated(airspeed_validated.airspeed_sensor_measurement_valid==0,:) = [];
     airspeed_validated = airspeed_validated(:,'true_airspeed_m_s');
     airspeed_validated = retime(airspeed_validated,Time,'pchip');
@@ -318,7 +318,7 @@ end
 
 % actuator_controls
 if any(strcmp(topicsAvail,'actuator_controls_0'))
-    actuator_controls = msg('actuator_controls_0',:).TopicMessages{:}(:,'control');
+    actuator_controls = msg('actuator_controls_0',:).TopicMessages{1}(:,'control');
     actuator_controls = retime(actuator_controls,Time,'pchip');
     data = addvars(data,actuator_controls.control,'NewVariableNames','actuator_controls');
     clear actuator_controls
@@ -336,7 +336,7 @@ if DataLevel > 1
 
     % actuator_outputs
     if any(strcmp(topicsAvail,'actuator_outputs'))
-        actuator_outputs = msg('actuator_outputs',:).TopicMessages{:}(:,'output');
+        actuator_outputs = msg('actuator_outputs',:).TopicMessages{1}(:,'output');
         actuator_outputs = retime(actuator_outputs,Time,'nearest');
         data = addvars(data,actuator_outputs.output,'NewVariableNames','actuator_outputs');
         clear actuator_outputs
@@ -344,15 +344,24 @@ if DataLevel > 1
        
     % input_rc
     if any(strcmp(topicsAvail,'input_rc'))
-        input_rc = msg('input_rc',:).TopicMessages{:}(:,'values');
+        input_rc = msg('input_rc',:).TopicMessages{1}(:,'values');
         input_rc = retime(input_rc,Time,'nearest');
         data = addvars(data,input_rc.values,'NewVariableNames','input_rc');
         clear input_rc
     end
 
+    % actuator_motors
+    if any(strcmp(topicsAvail,'actuator_motors'))
+        actuator_motors = msg('actuator_motors',:).TopicMessages{1}(:,["timestamp_sample","control"]);
+        actuator_motors = timetable(actuator_motors.timestamp_sample,actuator_motors.control,'VariableNames',{'control'});
+        actuator_motors = retime(actuator_motors,Time,'pchip');
+        data = addvars(data,actuator_motors.control,'NewVariableNames','actuator_motors');
+        clear actuator_motors
+    end
+
     % esc_status
     if any(strcmp(topicsAvail,'esc_status'))
-        esc_status = msg('esc_status',:).TopicMessages{:};
+        esc_status = msg('esc_status',:).TopicMessages{1};
         timestamp = esc_status.timestamp;
             
         % get number of ESCs
@@ -386,7 +395,7 @@ if DataLevel > 1
 
     % vehicle_air_data
     if any(strcmp(topicsAvail,'vehicle_air_data'))
-        vehicle_air_data = msg('vehicle_air_data',:).TopicMessages{:}(:,...
+        vehicle_air_data = msg('vehicle_air_data',:).TopicMessages{1}(:,...
             {'baro_alt_meter','baro_temp_celcius','baro_pressure_pa','rho'});
         vehicle_air_data = retime(vehicle_air_data,Time,'pchip');
         data = addvars(data,double(vehicle_air_data.baro_alt_meter),...
@@ -399,7 +408,7 @@ if DataLevel > 1
 
     % vehicle_angular_acceleration
     if any(strcmp(topicsAvail,'vehicle_angular_acceleration'))
-        vehicle_angular_acceleration = msg('vehicle_angular_acceleration',:).TopicMessages{:};
+        vehicle_angular_acceleration = msg('vehicle_angular_acceleration',:).TopicMessages{1};
         vehicle_angular_acceleration = retime(vehicle_angular_acceleration,Time,'pchip');
         data = addvars(data,vehicle_angular_acceleration.xyz,'NewVariableNames','omegadot_rad_s2');
         clear vehicle_angular_acceleration
@@ -424,7 +433,7 @@ if DataLevel > 2
 
     % rpm
     if any(strcmp(topicsAvail,'rpm'))
-        rpm = msg('rpm',:).TopicMessages{:}(:,'indicated_frequency_rpm');
+        rpm = msg('rpm',:).TopicMessages{1}(:,'indicated_frequency_rpm');
         rpm = rmoutliers(rpm);
         rpm = retime(rpm,Time,'pchip');
         data = addvars(data,rpm.indicated_frequency_rpm,'NewVariableNames','indicated_rpm');
@@ -433,7 +442,7 @@ if DataLevel > 2
     
     % sensor_combined
     if any(strcmp(topicsAvail,'sensor_combined'))
-        sensor_combined = msg('sensor_combined',:).TopicMessages{:}(:,...
+        sensor_combined = msg('sensor_combined',:).TopicMessages{1}(:,...
             {'gyro_rad','accelerometer_m_s2'});
         sensor_combined = retime(sensor_combined,Time,'linear');
         data = addvars(data,sensor_combined.gyro_rad,sensor_combined.accelerometer_m_s2,...
@@ -443,12 +452,12 @@ if DataLevel > 2
 
     % sensor_mag
     if any(strcmp(topicsAvail,'vehicle_magnetometer'))
-        sensor_mag = msg('vehicle_magnetometer',:).TopicMessages{:}(:,'magnetometer_ga');
+        sensor_mag = msg('vehicle_magnetometer',:).TopicMessages{1}(:,'magnetometer_ga');
         sensor_mag = retime(sensor_mag,Time,'pchip');
         data = addvars(data,sensor_mag.magnetometer_ga,'NewVariableNames','magnetometer_ga');
         clear sensor_mag
     elseif any(strcmp(topicsAvail,'sensor_mag'))
-        sensor_mag = msg('sensor_mag',:).TopicMessages{:}(:,{'x','y','z'});
+        sensor_mag = msg('sensor_mag',:).TopicMessages{1}(:,{'x','y','z'});
         sensor_mag = retime(sensor_mag,Time,'pchip');
         data = addvars(data,[sensor_mag.x,sensor_mag.y,sensor_mag.z],...
             'NewVariableNames','magnetometer_ga');
@@ -457,7 +466,7 @@ if DataLevel > 2
 
     % yaw_estimator_status
     if any(strcmp(topicsAvail,'yaw_estimator_status'))
-        yaw_estimator_status = msg('yaw_estimator_status',:).TopicMessages{:}(:,'yaw_variance');
+        yaw_estimator_status = msg('yaw_estimator_status',:).TopicMessages{1}(:,'yaw_variance');
         yaw_estimator_status = retime(yaw_estimator_status,Time,'pchip');
         data = addvars(data,yaw_estimator_status.yaw_variance,...
             'NewVariableNames','yaw_variance_rad2');
@@ -479,12 +488,12 @@ if DataLevel > 2
     if any(strcmp(topicsAvail,'estimator_states'))
         
         % States and covariances
-        estimator_states = msg('estimator_states',:).TopicMessages{:}(:,...
+        estimator_states = msg('estimator_states',:).TopicMessages{1}(:,...
             {'states','covariances'});
         
         % Status (add more as needed)
         if any(strcmp(topicsAvail,'estimator_status'))
-            estimator_status = msg('estimator_status',:).TopicMessages{:}(:,...
+            estimator_status = msg('estimator_status',:).TopicMessages{1}(:,...
                 {'pos_horiz_accuracy','pos_vert_accuracy'});
             estimator_status = retime(estimator_status,Time,'pchip');
             data = addvars(data,estimator_status.pos_horiz_accuracy,estimator_status.pos_vert_accuracy,...
@@ -501,9 +510,9 @@ if DataLevel > 2
     elseif any(strcmp(topicsAvail,'estimator_status')) % v1.11.3 and earlier
         
         % States, covariances, status
-        estimator_states = msg('estimator_status',:).TopicMessages{:}(:,...
+        estimator_states = msg('estimator_status',:).TopicMessages{1}(:,...
             {'states','covariances'});
-        estimator_status = msg('estimator_status',:).TopicMessages{:}(:,...
+        estimator_status = msg('estimator_status',:).TopicMessages{1}(:,...
             {'pos_horiz_accuracy','pos_vert_accuracy'});
     
         % add to timetable
@@ -523,7 +532,7 @@ if DataLevel > 2
     %       TODO
     %
     if any(strcmp(topicsAvail,'airdata'))
-        airdata = msg('airdata',:).TopicMessages{:};
+        airdata = msg('airdata',:).TopicMessages{1};
 %         figure
 %         hold on
         
@@ -563,7 +572,7 @@ if DataLevel > 2
     if any(strcmp(topicsAvail,'estimator_sensor_bias'))
     
         % Get each sensor's bias estimates
-        estimator_sensor_bias = msg('estimator_sensor_bias',:).TopicMessages{:};
+        estimator_sensor_bias = msg('estimator_sensor_bias',:).TopicMessages{1};
         gyro_bias = estimator_sensor_bias(:,'gyro_bias');
         accel_bias = estimator_sensor_bias(:,'accel_bias');
         mag_bias = estimator_sensor_bias(:,'mag_bias');
@@ -602,7 +611,7 @@ if DebugLevel > 0
     
     % vehicle_control_mode
     if any(strcmp(topicsAvail,'vehicle_control_mode'))
-        vehicle_control_mode = msg('vehicle_control_mode',:).TopicMessages{:};
+        vehicle_control_mode = msg('vehicle_control_mode',:).TopicMessages{1};
         vehicle_control_mode = retime(vehicle_control_mode,Time,'previous');
         data = addvars(data,vehicle_control_mode);
         clear vehicle_control_mode
@@ -610,7 +619,7 @@ if DebugLevel > 0
 
     % vehicle_thrust_setpoint
     if any(strcmp(topicsAvail,'vehicle_thrust_setpoint'))
-        vehicle_thrust_setpoint = msg('vehicle_thrust_setpoint',:).TopicMessages{:};
+        vehicle_thrust_setpoint = msg('vehicle_thrust_setpoint',:).TopicMessages{1};
         ts = vehicle_thrust_setpoint.timestamp_sample;
         Td = -double(vehicle_thrust_setpoint.xyz(:,3));
         Td = interp1(ts,Td,Time,'previous',0);
@@ -620,7 +629,7 @@ if DebugLevel > 0
 
     % vehicle_torque_setpoint
     if any(strcmp(topicsAvail,'vehicle_torque_setpoint'))
-        vehicle_torque_setpoint = msg('vehicle_torque_setpoint',:).TopicMessages{:};
+        vehicle_torque_setpoint = msg('vehicle_torque_setpoint',:).TopicMessages{1};
         ts = vehicle_torque_setpoint.timestamp_sample;
         taud = double(vehicle_torque_setpoint.xyz);
         taud = interp1(ts,taud,Time,'previous',0);
@@ -630,7 +639,7 @@ if DebugLevel > 0
 
     % vehicle_rates_setpoint
     if any(strcmp(topicsAvail,'vehicle_rates_setpoint'))
-        vehicle_rates_setpoint = msg('vehicle_rates_setpoint',:).TopicMessages{:};
+        vehicle_rates_setpoint = msg('vehicle_rates_setpoint',:).TopicMessages{1};
         vehicle_rates_setpoint = retime(vehicle_rates_setpoint,Time,'previous');
         omega_setpoint_rad_s = double(vehicle_rates_setpoint{:,["roll","pitch","yaw"]});
         data = addvars(data,omega_setpoint_rad_s);
@@ -639,7 +648,7 @@ if DebugLevel > 0
 
     % vehicle_attitude_setpoint
     if any(strcmp(topicsAvail,'vehicle_attitude_setpoint'))
-        vehicle_attitude_setpoint = msg('vehicle_attitude_setpoint',:).TopicMessages{:};
+        vehicle_attitude_setpoint = msg('vehicle_attitude_setpoint',:).TopicMessages{1};
         vehicle_attitude_setpoint = retime(vehicle_attitude_setpoint,Time,'previous');
         EulerAngles_setpoint_rad = double(vehicle_attitude_setpoint{:,["roll_body","pitch_body","yaw_body"]});
         data = addvars(data,EulerAngles_setpoint_rad);
@@ -648,7 +657,7 @@ if DebugLevel > 0
 
     % vehicle_local_position_setpoint
     if any(strcmp(topicsAvail,'vehicle_local_position_setpoint'))
-        vehicle_local_position_setpoint = msg('vehicle_local_position_setpoint',:).TopicMessages{:};
+        vehicle_local_position_setpoint = msg('vehicle_local_position_setpoint',:).TopicMessages{1};
         vehicle_local_position_setpoint = retime(vehicle_local_position_setpoint(:,["x","y","z","vx","vy","vz"]),Time,'previous');
         NED_setpoint_m = double(vehicle_local_position_setpoint{:,["x","y","z"]});
         vi_setpoint_m_s = double(vehicle_local_position_setpoint{:,["vx","vy","vz"]});
@@ -662,7 +671,7 @@ if DebugLevel > 1
     
     % vehicle_status
     if any(strcmp(topicsAvail,'vehicle_status'))
-        vehicle_status = msg('vehicle_status',:).TopicMessages{:};
+        vehicle_status = msg('vehicle_status',:).TopicMessages{1};
         vehicle_status = retime(vehicle_status,Time,'nearest');
         data = addvars(data,vehicle_status);
         clear vehicle_status
@@ -670,7 +679,7 @@ if DebugLevel > 1
 
     % vehicle_status_flags
     if any(strcmp(topicsAvail,'vehicle_status_flags'))
-        vehicle_status_flags = msg('vehicle_status_flags',:).TopicMessages{:};
+        vehicle_status_flags = msg('vehicle_status_flags',:).TopicMessages{1};
         vehicle_status_flags = retime(vehicle_status_flags,Time,'nearest');
         data = addvars(data,vehicle_status_flags);
         clear vehicle_status_flags
