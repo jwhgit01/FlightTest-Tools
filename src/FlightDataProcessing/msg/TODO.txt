@@ -1,1 +1,0 @@
-place funtions for ulog msg parsing here. e.g. vehicle_attitude
