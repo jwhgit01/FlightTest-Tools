@@ -136,9 +136,8 @@ methods
         % vehicle_status_flags
 
         % TODOs:
-        %   Remove NaN's after everything is added?
+        %   Remove NaN's after everything is added
         %   Optional status print outs
-        %   Fix ActuatorControls
 
     end % ulg2tt
     
@@ -630,7 +629,7 @@ methods(Access = private)
         end
 
         % Read topic messages
-        esc_status = readTopicMsgs(ulog,"TopicNames","esc_status").TopicMessages{1};
+        esc_status = readTopicMsgs(ulog,"TopicNames","actuator_motors").TopicMessages{1};
         timestamp = esc_status.timestamp;
                 
         % Get number of ESCs
@@ -669,14 +668,14 @@ methods(Access = private)
 
     end % ESCStatus
 
-    function VehicleAirData(obj,ulog)
+    function VehicleAirData(obj,msg)
 
         if ~any(strcmp(obj.AvailableMessages,'vehicle_air_data'))
             return
         end
 
         % Read topic messages
-        vehicle_air_data = readTopicMsgs(ulog,"TopicNames","vehicle_air_data").TopicMessages{1};
+        vehicle_air_data = msg('vehicle_air_data',:).TopicMessages{1};
 
         % Change timestamps to sample timestamps
         vehicle_air_data.timestamp = vehicle_air_data.timestamp_sample;
@@ -709,14 +708,14 @@ methods(Access = private)
 
     end % VehicleAirData
 
-    function RPM(obj,ulog)
+    function RPM(obj,msg)
 
         if ~any(strcmp(obj.AvailableMessages,'rpm'))
             return
         end
 
         % Read topic messages
-        rpm = readTopicMsgs(ulog,"TopicNames","rpm").TopicMessages{1}(:,"indicated_frequency_rpm");
+        rpm = msg('rpm',:).TopicMessages{1}(:,"indicated_frequency_rpm");
         rpm.indicated_frequency_rpm = double(rpm.indicated_frequency_rpm);
 
         % Remove outliers due to Thunderfly bug
@@ -738,14 +737,14 @@ methods(Access = private)
 
     end % RPM
 
-    function SensorCombined(obj,ulog)
+    function SensorCombined(obj,msg)
 
         if ~any(strcmp(obj.AvailableMessages,'sensor_combined'))
             return
         end
 
         % Read topic messages
-        sensor_combined = readTopicMsgs(ulog,"TopicNames","sensor_combined").TopicMessages{1}(:,["gyro_rad","accelerometer_m_s2"]);
+        sensor_combined = msg('sensor_combined',:).TopicMessages{1}(:,["gyro_rad","accelerometer_m_s2"]);
         
         % Filter data if applicable
         fs = 1/median(diff(seconds(sensor_combined.timestamp)));
@@ -764,7 +763,7 @@ methods(Access = private)
 
     end % SensorCombined
 
-    function SensorMag(obj,ulog)
+    function SensorMag(obj,msg)
 
         if ~any(strcmp(obj.AvailableMessages,'sensor_mag'))
             return
@@ -799,14 +798,14 @@ methods(Access = private)
 
     end % SensorMag
 
-    function VehicleMagnetometer(obj,ulog)
+    function VehicleMagnetometer(obj,msg)
 
         if ~any(strcmp(obj.AvailableMessages,'vehicle_magnetometer'))
             return
         end
 
         % Read topic messages
-        vehicle_magnetometer = readTopicMsgs(ulog,"TopicNames","vehicle_magnetometer").TopicMessages{1}(:,"magnetometer_ga");
+        vehicle_magnetometer = msg('vehicle_magnetometer',:).TopicMessages{1}(:,"magnetometer_ga");
         
         % Filter data if applicable
         fs = 1/median(diff(seconds(vehicle_magnetometer.timestamp)));
@@ -825,14 +824,14 @@ methods(Access = private)
 
     end % VehicleMagnetometer
 
-    function YawEstimatorStatus(obj,ulog)
+    function YawEstimatorStatus(obj,msg)
 
         if ~any(strcmp(obj.AvailableMessages,'yaw_estimator_status'))
             return
         end
 
         % Read topic messages
-        yaw_estimator_status = readTopicMsgs(ulog,"TopicNames","yaw_estimator_status").TopicMessages{1};
+        yaw_estimator_status = msg('yaw_estimator_status',:).TopicMessages{1};
 
         % Create new timetable from sample timestamps
         if any(strcmp(yaw_estimator_status.Properties.VariableNames,'timestamp_sample'))
@@ -860,14 +859,14 @@ methods(Access = private)
 
     end % YawEstimatorStatus
 
-    function EstimatorStates(obj,ulog)
+    function EstimatorStates(obj,msg)
 
         if ~any(strcmp(obj.AvailableMessages,'estimator_states'))
             return
         end
 
         % Read topic messages
-        estimator_states = readTopicMsgs(ulog,"TopicNames","estimator_states").TopicMessages{1};
+        estimator_states = msg('estimator_states',:).TopicMessages{1};
 
         % Create new timetable from sample timestamps
         estimator_states = timetable(estimator_states.timestamp_sample,...
@@ -894,14 +893,14 @@ methods(Access = private)
 
     end % EstimatorStates
 
-    function EstimatorStatus(obj,ulog)
+    function EstimatorStatus(obj,msg)
 
         if ~any(strcmp(obj.AvailableMessages,'estimator_status'))
             return
         end
 
         % Read topic messages
-        estimator_status = readTopicMsgs(ulog,"TopicNames","estimator_status").TopicMessages{1};
+        estimator_status = msg('estimator_status',:).TopicMessages{1};
 
         % If using PX4 v1.11.3 or earlier, get states and variances
         if any(strcmp(estimator_status.Properties.VariableNames,'states'))
@@ -947,14 +946,14 @@ methods(Access = private)
 
     end % EstimatorStatus
 
-    function Airdata(obj,ulog)
+    function Airdata(obj,msg)
 
         if ~any(strcmp(obj.AvailableMessages,'airdata'))
             return
         end
 
         % Read topic messages
-        airdata = readTopicMsgs(ulog,"TopicNames","airdata").TopicMessages{1};
+        airdata = msg('airdata',:).TopicMessages{1};
 
         % The variable names/units have changed over the years...
         if any(strcmp(airdata.Properties.VariableNames,'alpha_deg'))

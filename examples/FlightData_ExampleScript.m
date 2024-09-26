@@ -1,18 +1,15 @@
 % Example usage of FlightData objects
 %
-% (C) 2023 Jeremy Hopwood <jeremyhopwood@vt.edu>
+% (C) 2024 Jeremy Hopwood <jeremyhopwood@vt.edu>
 %
 addpath(genpath('../src/'))
 close all
 clear
 clc
 
-% convert ulog file to a timetable
-ulogFile = 'ExampleData.ulg';
-
 % Create a FlightData object
-fd = FlightData(ulogFile);
-fd.MessageSet = 'Estimation';
+fd = FlightData("ExampleData.ulg");
+fd.Estimation = true;
 fd.CutoffFrequency = 10;
 
 % Convert ulog file to a timetable
