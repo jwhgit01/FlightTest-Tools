@@ -141,6 +141,14 @@ methods
         %   Fix ActuatorControls
 
     end % ulg2tt
+
+    function plot(obj)
+        if isempty(obj.Data)
+            warning('No data to plot!')
+            return
+        end
+        stackedplot(obj.Data,{'NED_m','EulerAngles_rad','vb_m_s','omega_rad_s'})
+    end % plot
     
 end % public methods
 

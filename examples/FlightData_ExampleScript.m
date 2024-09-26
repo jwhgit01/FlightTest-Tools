@@ -16,12 +16,16 @@ fd.CutoffFrequency = 10;
 fd.ulg2tt;
 data = fd.Data;
 
+% Plot data from entire flight
+figure
+fd.plot;
+
 % Trim the data to a timerange of interest
-ts = seconds(115);
-te = seconds(565);
+ts = seconds(140);
+te = seconds(150);
 trange = timerange(ts,te);
 maneuver = data(trange,:);
 
-% Plot
+% Plot the maneuver
 figure
 stackedplot(maneuver,{'NED_m','EulerAngles_rad','vb_m_s','omega_rad_s'})
