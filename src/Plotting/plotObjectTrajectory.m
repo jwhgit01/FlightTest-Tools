@@ -1,4 +1,4 @@
-function plotObjectTrajectory(translations,rotations,scaleFactor,numObjects,stl)
+function plotObjectTrajectory(NED,R_IB,scaleFactor,numObjects,stl,R_BS)
 %plotObjectTrajectory
 %
 % Copyright (c) 2023 Jeremy W. Hopwood. All rights reserved.
@@ -10,9 +10,10 @@ function plotObjectTrajectory(translations,rotations,scaleFactor,numObjects,stl)
 %
 % Inputs:
 %
-%   translations  See documentation for plotTransforms.m
+%   NED           Array of position vectors
 %
-%   rotations     See documentation for plotTransforms.m
+%   R_IB          Array of so(3) objects that map the body frame to the
+%                 local NED frame
 %
 %   scaleFactor   A scale factor that determines how large the 3D object
 %                 defined by the input 'stl' is displayed.
@@ -21,28 +22,36 @@ function plotObjectTrajectory(translations,rotations,scaleFactor,numObjects,stl)
 %
 %   stl           The filename of an STL file that defines the 3D object.
 %
+%   R_BS          The so(3) object that defines the orientation of the body
+%                 in the STL file with respect to the body frame. (Optional)
+%
 %
 
 % input arguments error checking
-if nargin~=5
+if nargin~=6
     error('Incorrect number of inputs.');
 end
-if (length(translations)~=length(rotations))
+if (length(NED)~=length(R_IB))
     error('Number of samples is not consistent.');
 end
 
-% color of path
-BurntOrange = [232,119,34]/255;
-pathColor = BurntOrange;
+% Plotting colors
+pathColor = 'k';
+objectColor = '#E66100';
 
 % NED --> ENU
-ENU = [translations(:,2), translations(:,1), -translations(:,3)];
+ENU = [NED(:,2), NED(:,1), -NED(:,3)];
 x = ENU(:,1);
 y = ENU(:,2);
 z = ENU(:,3);
 
+% Transform body
+R_EI = so3([pi/2 0 pi],"eul"); % "E" denotes the ENU frame
+R_RE = so3([0,0,pi],"eul"); % "R" denotes the robotics toolbox z-up frame
+R_RS = R_RE*R_EI*R_IB*R_BS; % "S" denotes the STL frame
+
 % number of samples
-N = length(translations);
+N = length(NED);
 
 % plot the object path
 hold on
@@ -50,9 +59,11 @@ plot3(x,y,z,'linewidth',1.5,'Color',pathColor)
 
 % plot the objects
 samplingFactor = floor(N/(numObjects-1));
-indices = 1:samplingFactor:N;
-for k = indices
-    plotTransforms(ENU(k,:),rotations(k,:),'MeshFilePath',stl,'FrameSize',scaleFactor)
+k = 1:samplingFactor:N;
+if isempty(stl)
+    plotTransforms([x(k) -y(k) -z(k)],R_RS(:,k),'FrameSize',scaleFactor,"InertialZDirection","Down")
+else
+    plotTransforms([x(k) -y(k) -z(k)],R_RS(:,k),"MeshColor",objectColor,'MeshFilePath',stl,'FrameSize',scaleFactor,"InertialZDirection","Down")
 end
 hold off
 grid on
@@ -71,6 +82,5 @@ axis(limits);
 grid on
 view(35,25);
 daspect([1 1 1]);
-lightangle(35,60)
 
 end
