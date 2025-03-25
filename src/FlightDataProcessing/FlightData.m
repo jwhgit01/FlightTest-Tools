@@ -147,7 +147,7 @@ methods
             warning('No data to plot!')
             return
         end
-        stackedplot(obj.Data,{'NED_m','EulerAngles_rad','vb_m_s','omega_rad_s'})
+        stackedplot(obj.Data,{'NED_m','EulerAngles_rad','vb_m_s','omega_rad_s','zulu_time'})
     end % plot
     
 end % public methods
@@ -302,25 +302,21 @@ methods(Access = private)
         vehicle_attitude = retime(vehicle_attitude,obj.Data.Time,'pchip','EndValues',NaN);
 
         % Compute rotation matrix and Euler angles from quaternion
-        R_BI = quat2dcm(vehicle_attitude.q); % rotation from NED to body frame
-        [Yaw_rad,Pitch_rad,Roll_rad] = dcm2angle(R_BI,'ZYX'); % 3-2-1 euler parameterization
-        EulerAngles_rad = [Roll_rad,Pitch_rad,Yaw_rad]; % euler angles
-        Yaw_unwrapped_rad = Yaw_rad;
-        wrap_counter = 0;
-        for k = 2:length(Yaw_rad) 
-            if Yaw_rad(k) - Yaw_rad(k-1) > pi
-                wrap_counter = wrap_counter - 1;
-            end
-            if Yaw_rad(k) - Yaw_rad(k-1) < -pi
-                wrap_counter = wrap_counter + 1;
-            end
-            Yaw_unwrapped_rad(k) = Yaw_rad(k) + 2*pi*wrap_counter;
+        Nq = height(vehicle_attitude);
+        R_IB = zeros(3,3,Nq);
+        for k = 1:Nq
+            q = vehicle_attitude.q(k,:).';
+            qvec = q(2:4,1);
+            q0 = q(1,1);
+            R_BI = (q0^2-qvec'*qvec)*eye(3) + 2*(qvec*qvec') - 2*q0*cpem(qvec);
+            R_IB(:,:,k) = R_BI';
         end
+        [Yaw_rad,Pitch_rad,Roll_rad] = dcm2angle(pagetranspose(R_IB),'ZYX');
+        EulerAngles_rad = [Roll_rad,Pitch_rad,unwrap(Yaw_rad)];
 
         % Add data to timetable
-        obj.Data = addvars(obj.Data,EulerAngles_rad,permute(R_BI,[3,1,2]),...
-            Yaw_unwrapped_rad,'NewVariableNames',...
-            {'EulerAngles_rad','R_BI','Yaw_unwrapped_rad'});
+        obj.Data = addvars(obj.Data,EulerAngles_rad,permute(R_IB,[3,1,2]),...
+            'NewVariableNames',{'EulerAngles_rad','R_IB'});
 
     end % VehicleAttitude
 
@@ -343,9 +339,9 @@ methods(Access = private)
 
         % Loop through each sample and compute body frame quantities
         for k = 1:N % loop through timetable
-            R_BI_k = squeeze(obj.Data{k,"R_BI"});
-            vb_m_s(k,:) = (R_BI_k*(vi_m_s(k,:).')).'; % body velocity
-            ab_m_s2(k,:) = (R_BI_k*(ai_m_s2(k,:).')).'; % inertial acceleration in body frame
+            R_IB_k = squeeze(obj.Data{k,"R_IB"});
+            vb_m_s(k,:) = (R_IB_k'*(vi_m_s(k,:).')).'; % body velocity
+            ab_m_s2(k,:) = (R_IB_k'*(ai_m_s2(k,:).')).'; % inertial acceleration in body frame
             V_m_s_derived(k,1) = norm(vi_m_s(k,:)); % derived airspeed (m/s)
             alpha_deg_derived(k,1) = atan2d(vb_m_s(k,3),vb_m_s(k,1)); % angle of attack (deg)
             beta_deg_derived(k,1) = asind(vb_m_s(k,2)/V_m_s_derived(k,1)); % sideslip (deg)
