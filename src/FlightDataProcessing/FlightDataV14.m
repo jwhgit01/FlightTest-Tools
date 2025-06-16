@@ -1,4 +1,4 @@
-classdef FlightData < handle
+classdef FlightDataV14 < handle
 
 properties
     Data
