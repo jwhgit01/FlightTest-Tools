@@ -25,7 +25,7 @@ end % private properties
 
 methods
 
-    function obj = FlightData(UlogFile)
+    function obj = FlightDataV14(UlogFile)
         %FlightData Default constructor
 
         % If a ulog file is given, add it.
@@ -33,7 +33,7 @@ methods
             obj.UlogFile = UlogFile;
         end
 
-    end % FlightData
+    end % FlightDataV14
     
     function ulg2tt(obj,ulogObj)
         %ulg2tt
@@ -492,14 +492,14 @@ methods(Access = private)
             actuator_controls_0.Properties.DimensionNames{1} = 'Time';
         end
 
-        % Filter data if applicable
-        fs = 1/median(diff(seconds(actuator_controls_0.Time)));
-        if ~isempty(obj.CutoffFrequency) && (floor(fs) > 2*obj.CutoffFrequency)
-            Wn = 2*obj.CutoffFrequency/fs; % fraction of the Nyquist rate
-            [num,den] = butter(5,Wn); % 5th order lowpass filter
-            actuator_controls_0.control = filtfilt(num,den,...
-                actuator_controls_0.control);
-        end
+        % Do not filter...
+        % fs = 1/median(diff(seconds(actuator_controls_0.Time)));
+        % if ~isempty(obj.CutoffFrequency) && (floor(fs) > 2*obj.CutoffFrequency)
+        %     Wn = 2*obj.CutoffFrequency/fs; % fraction of the Nyquist rate
+        %     [num,den] = butter(5,Wn); % 5th order lowpass filter
+        %     actuator_controls_0.control = filtfilt(num,den,...
+        %         actuator_controls_0.control);
+        % end
 
         % Re-time and add data to timetable
         actuator_controls_0 = retime(actuator_controls_0,obj.Data.Time,...
@@ -525,14 +525,19 @@ methods(Access = private)
         % Remove columns of NaN
         idx = all(isnan(actuator_motors.control));
         actuator_motors.control(:,idx) = [];
+        
+        % Remove duplicate times
+        uniqueTimes = unique(actuator_motors.Time);
+        actuator_motors = retime(actuator_motors,uniqueTimes,'firstvalue');
 
-        % Filter data if applicable
-        fs = 1/median(diff(seconds(actuator_motors.Time)));
-        if ~isempty(obj.CutoffFrequency) && (floor(fs) > 2*obj.CutoffFrequency)
-            Wn = 2*obj.CutoffFrequency/fs; % fraction of the Nyquist rate
-            [num,den] = butter(5,Wn); % 5th order lowpass filter
-            actuator_motors.control = filtfilt(num,den,actuator_motors.control);
-        end
+        % Do not filter...
+        % fs = 1/median(diff(seconds(actuator_motors.Time)));
+        % if ~isempty(obj.CutoffFrequency) && (floor(fs) > 2*obj.CutoffFrequency)
+        %     Wn = 2*obj.CutoffFrequency/fs; % fraction of the Nyquist rate
+        %     [num,den] = butter(5,Wn); % 5th order lowpass filter
+        %     idx = ~isnan(actuator_motors.control);
+        %     actuator_motors.control(idx,:) = filtfilt(num,den,actuator_motors.control(idx,:));
+        % end
 
         % Re-time and add data to timetable
         actuator_motors = retime(actuator_motors,obj.Data.Time,...
@@ -559,13 +564,17 @@ methods(Access = private)
         idx = all(isnan(actuator_servos.control));
         actuator_servos.control(:,idx) = [];
 
-        % Filter data if applicable
-        fs = 1/median(diff(seconds(actuator_servos.Time)));
-        if ~isempty(obj.CutoffFrequency) && (floor(fs) > 2*obj.CutoffFrequency)
-            Wn = 2*obj.CutoffFrequency/fs; % fraction of the Nyquist rate
-            [num,den] = butter(5,Wn); % 5th order lowpass filter
-            actuator_servos.control = filtfilt(num,den,actuator_servos.control);
-        end
+        % Remove duplicate times
+        uniqueTimes = unique(actuator_servos.Time);
+        actuator_servos = retime(actuator_servos,uniqueTimes,'firstvalue');
+
+        % Do not filter...
+        % fs = 1/median(diff(seconds(actuator_servos.Time)));
+        % if ~isempty(obj.CutoffFrequency) && (floor(fs) > 2*obj.CutoffFrequency)
+        %     Wn = 2*obj.CutoffFrequency/fs; % fraction of the Nyquist rate
+        %     [num,den] = butter(5,Wn); % 5th order lowpass filter
+        %     actuator_servos.control = filtfilt(num,den,actuator_servos.control);
+        % end
 
         % Re-time and add data to timetable
         actuator_servos = retime(actuator_servos,obj.Data.Time,...
@@ -594,13 +603,13 @@ methods(Access = private)
             actuator_outputs.output = actuator_outputs.output(:,1:noutputs);
             actuator_outputs = actuator_outputs(:,"output");
     
-            % Filter data if applicable
-            fs = 1/median(diff(seconds(actuator_outputs.timestamp)));
-            if ~isempty(obj.CutoffFrequency) && (floor(fs) > 2*obj.CutoffFrequency)
-                Wn = 2*obj.CutoffFrequency/fs; % fraction of the Nyquist rate
-                [num,den] = butter(5,Wn); % 5th order lowpass filter
-                actuator_outputs.output = filtfilt(num,den,actuator_outputs.output);
-            end
+            % Do not filter...
+            % fs = 1/median(diff(seconds(actuator_outputs.timestamp)));
+            % if ~isempty(obj.CutoffFrequency) && (floor(fs) > 2*obj.CutoffFrequency)
+            %     Wn = 2*obj.CutoffFrequency/fs; % fraction of the Nyquist rate
+            %     [num,den] = butter(5,Wn); % 5th order lowpass filter
+            %     actuator_outputs.output = filtfilt(num,den,actuator_outputs.output);
+            % end
     
             % Re-time and add data to timetable
             actuator_outputs = retime(actuator_outputs,obj.Data.Time,...
