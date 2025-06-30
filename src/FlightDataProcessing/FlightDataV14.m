@@ -333,8 +333,8 @@ methods(Access = private)
         ai_m_s2 = obj.Data.ai_m_s2;
         vb_m_s = zeros(N,3);
         ab_m_s2 = zeros(N,3);
-        alpha_deg_derived = zeros(N,1);
-        beta_deg_derived = zeros(N,1);
+        alpha_derived_rad = zeros(N,1);
+        beta_derived_rad = zeros(N,1);
         V_m_s_derived = zeros(N,1);
 
         % Loop through each sample and compute body frame quantities
@@ -343,15 +343,15 @@ methods(Access = private)
             vb_m_s(k,:) = (R_IB_k'*(vi_m_s(k,:).')).'; % body velocity
             ab_m_s2(k,:) = (R_IB_k'*(ai_m_s2(k,:).')).'; % inertial acceleration in body frame
             V_m_s_derived(k,1) = norm(vi_m_s(k,:)); % derived airspeed (m/s)
-            alpha_deg_derived(k,1) = atan2d(vb_m_s(k,3),vb_m_s(k,1)); % angle of attack (deg)
-            beta_deg_derived(k,1) = asind(vb_m_s(k,2)/V_m_s_derived(k,1)); % sideslip (deg)
+            alpha_derived_rad(k,1) = atan2(vb_m_s(k,3),vb_m_s(k,1)); % angle of attack (rad)
+            beta_derived_rad(k,1) = asin(vb_m_s(k,2)/V_m_s_derived(k,1)); % sideslip (rad)
         end
 
         % Add to timetable
         obj.Data = addvars(obj.Data,vb_m_s,ab_m_s2,V_m_s_derived,...
-            alpha_deg_derived,beta_deg_derived,'NewVariableNames',...
+            alpha_derived_rad,beta_derived_rad,'NewVariableNames',...
             {'vb_m_s','ab_m_s2','V_m_s_derived',...
-            'alpha_deg_derived','beta_deg_derived'});
+            'alpha_derived_rad','beta_derived_rad'});
 
     end % BodyVelocity
 
