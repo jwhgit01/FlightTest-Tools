@@ -1,4 +1,4 @@
-function trajectory(north,east,down,roll,pitch,yaw,scaleFactor,var,aircraft)
+function trajectory(north,east,down,roll,pitch,yaw,scaleFactor,var,aircraft,colors)
 %
 % (2021) Jeremy Hopwood <jeremyhopwood@vt.edu>
 %
@@ -30,7 +30,7 @@ function trajectory(north,east,down,roll,pitch,yaw,scaleFactor,var,aircraft)
 
 
 % input arguments error checking
-if nargin~=9
+if nargin<9
     error('Incorrect number of inputs.');
 end
 if (length(north)~=length(east))||(length(north)~=length(down))||(length(east)~=length(down))
@@ -41,6 +41,17 @@ if (length(pitch)~=length(roll))||(length(pitch)~=length(yaw))||(length(roll)~=l
 end
 if length(pitch)~=length(north)
     error('Number of position samples is not consitient with the number of attitude samples.');
+end
+
+% Default colors
+if nargin < 10 || length(colors) < 2
+    BurntOrange = [232,119,34]/255;
+    ChicagoMaroon = [134,31,65]/255;
+    pathColor = BurntOrange;
+    aircraftColor = ChicagoMaroon;
+else
+    pathColor = colors{1};
+    aircraftColor = colors{2};
 end
 
 % number of samples
@@ -83,7 +94,7 @@ V = V./(correctionFactor/scaleFactor);
 % plot an aircraft at the first point
 hold on
 Vnew = transformVertices(x(1),y(1),z(1),roll(1),pitch(1),yaw(1),V);
-p = newPatch(Vnew,F,C);
+p = newPatch(Vnew,F,C,aircraftColor);
 fig = gcf;
 
 % set the axes limits
@@ -104,10 +115,6 @@ if video
     writeVideo(var,frame);
 end
 
-% color of path
-BurntOrange = [232,119,34]/255;
-pathColor = BurntOrange;
-
 % loop through rest of data
 for ii = 2:N
     
@@ -126,7 +133,7 @@ for ii = 2:N
     elseif mod(ii,samplingFactor)==0
        
         Vnew = transformVertices(x(ii),y(ii),z(ii),roll(ii),pitch(ii),yaw(ii),V);
-        p = newPatch(Vnew,F,C);
+        p = newPatch(Vnew,F,C,aircraftColor);
         
     end
     
@@ -152,10 +159,9 @@ function Vnew = transformVertices(x,y,z,roll,pitch,yaw,V)
 end
 
 % plot a new aircraft body
-function p = newPatch(V,F,C)
-    ChicagoMaroon = [134,31,65]/255;
+function p = newPatch(V,F,C,aircraftColor)
     p=patch('faces', F, 'vertices' ,V);          
     p.FaceVertexCData = C;  
     p.EdgeColor = 'none'; 
-    p.FaceColor = ChicagoMaroon;
+    p.FaceColor = aircraftColor;
 end
