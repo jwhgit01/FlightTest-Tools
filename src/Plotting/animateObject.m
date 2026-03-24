@@ -48,22 +48,23 @@ N = length(translations);
 
 % plot an aircraft at the first point
 hold on
-ax = plotTransforms(ENU(1,:),rotations(1,:),'MeshFilePath',stl,'FrameSize',scaleFactor);
+h = plotTransforms(ENU(1,:),rotations(1,:),'MeshFilePath',stl,'FrameSize',scaleFactor);
 fig = gcf;
-xlabel('East [m]','FontSize',18)
-ylabel('North [m]','FontSize',18)
-zlabel('$\Delta h$ [m]','FontSize',18,'Interpreter','latex')
+% xlabel('East [m]','FontSize',18)
+% ylabel('North [m]','FontSize',18)
+% zlabel('$\Delta h$ [m]','FontSize',18,'Interpreter','latex')
 
 % set the axes limits
 limits = [min(x),max(x),min(y),max(y),min(z),max(z)];
 limits = limits + scaleFactor*[-1,1,-1,1,-1,1];
 axis(limits);
 
-% set lighting, view, aspect ratio, etc.
+% set view, aspect ratio, lighting
 grid on
 view(35,25);
 daspect([1 1 1]);
-lightangle(35,60)
+delete(findall(fig,'Type','light'));
+lightangle(35,60);
 
 % if video, open and get and write first frame
 frame = getframe(fig);
@@ -71,7 +72,7 @@ if ~isempty(vidObj)
     open(vidObj);
     writeVideo(vidObj,frame);
 end
-delete(ax.Children(2));
+delete(h.Children(2));
 
 % color of path
 BurntOrange = [232,119,34]/255;
@@ -83,14 +84,16 @@ for ii = 2:N
     % plot segment of path
     plot3([x(ii-1),x(ii)],[y(ii-1),y(ii)],[z(ii-1),z(ii)],'linewidth',1.5,'Color',pathColor);
     
-    % if we are making a video
-    ax = plotTransforms(ENU(ii,:),rotations(ii,:),'MeshFilePath',stl,'FrameSize',scaleFactor);
+    % plot body
+    h = plotTransforms(ENU(ii,:),rotations(ii,:),'MeshFilePath',stl,'FrameSize',scaleFactor);
+    delete(findall(fig,'Type','light'));
+    lightangle(35,60);
     frame = getframe(fig);
     if ~isempty(vidObj)
         writeVideo(vidObj,frame);
     end
     if ii < N
-        delete(ax.Children(1));
+        delete(h.Children(2));
     end
 
 end
