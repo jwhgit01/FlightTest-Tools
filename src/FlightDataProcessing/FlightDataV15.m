@@ -2,6 +2,7 @@ classdef FlightDataV15 < handle
 
 properties
     Data
+    Debug
     UlogFile
     TimeStep(1,1) double {mustBeReal, mustBeFinite, mustBePositive} = 0.1
     Estimation(1,1) logical = false
@@ -94,9 +95,9 @@ methods
         end
         Time = seconds(t_0:dt:t_f).';
     
-        % Create an empty timetable
+        % Create empty timetable
         obj.Data = timetable(Time);
-        
+
         % Add all available data to the timetable.
         % Note that methods with 'ulog' as the argument generally have multiple
         % instances of interest. Therefore, they are parsed differently.
@@ -126,9 +127,12 @@ methods
         obj.Airdata(ulog); % Custom
         obj.SensorFlowAngle(ulog); % Custom
 
+        % Debugging topics
+        obj.VehicleControlMode(ulog);
+
+
         % TODO:
         % estimator_sensor_bias
-        % vehicle_control_mode
         % vehicle_thrust_setpoint
         % vehicle_torque_setpoint
         % vehicle_rates_setpoint
@@ -177,8 +181,18 @@ methods(Access = private)
                 'altitude_ellipsoid_m','s_variance_m_s','eph','epv','vel_n_m_s','vel_e_m_s','vel_d_m_s'});
             utc_avail = true;
         elseif vehicle_global_position_avail
-            gps_data = readTopicMsgs(ulog,"TopicNames","vehicle_global_position").TopicMessages{1}(:,...
-                {'latitude_deg','longitude_deg','altitude_msl_m','altitude_ellipsoid_m','eph','epv'});
+            try
+                gps_data = readTopicMsgs(ulog,"TopicNames","vehicle_global_position").TopicMessages{1}(:,...
+                    {'latitude_deg','longitude_deg','altitude_msl_m','altitude_ellipsoid_m','eph','epv'});
+            catch
+                gps_data = readTopicMsgs(ulog,"TopicNames","vehicle_global_position").TopicMessages{1}(:,...
+                    {'lat','lon','alt','alt_ellipsoid','eph','epv'});
+                varNames = gps_data.Properties.VariableNames;
+                gps_data.Properties.VariableNames{strcmp(varNames,'lat')} = 'latitude_deg';
+                gps_data.Properties.VariableNames{strcmp(varNames,'lon')} = 'longitude_deg';
+                gps_data.Properties.VariableNames{strcmp(varNames,'alt')} = 'altitude_msl_m';
+                gps_data.Properties.VariableNames{strcmp(varNames,'alt_ellipsoid')} = 'altitude_ellipsoid_m';
+            end
             utc_avail = false;
         else
             % No GPS. Nothing to do.
@@ -218,8 +232,9 @@ methods(Access = private)
                 {'zulu_time','latitude_deg','longitude_deg','altitude_msl_m',...
                 'altitude_ellipsoid_m','gps_vel_variance_m2_s2','eph','epv','gps_vel_m_s'});
         else
-            obj.Data = addvars(obj.Data,gps_data.lat,gps_data.lon,gps_data.alt,...
-                'NewVariableNames',{'lat_deg','lon_deg','alt_m'});
+            obj.Data = addvars(obj.Data,gps_data.latitude_deg,gps_data.longitude_deg,...
+                gps_data.altitude_msl_m,'NewVariableNames',{'latitude_deg',...
+                'longitude_deg','altitude_msl_m'});
         end
 
     end % GPS
@@ -556,22 +571,16 @@ methods(Access = private)
         actuator_motors = timetable(actuator_motors.timestamp_sample,...
             actuator_motors.control,'VariableNames',{'control'});
 
-        % Remove columns of NaN
-        idx = all(isnan(actuator_motors.control));
-        actuator_motors.control(:,idx) = [];
-        
-        % Remove duplicate times
+        % Remove (TODO: trailing) columns of NaN
+        % idx = all(isnan(actuator_motors.control));
+        % actuator_motors.control(:,idx) = [];
+
+        % Sort by row times since timestamp_sample may be out of order
+        actuator_motors = sortrows(actuator_motors);
+
+        % Remove duplicate times by keeping the first occurrence
         uniqueTimes = unique(actuator_motors.Time);
         actuator_motors = retime(actuator_motors,uniqueTimes,'firstvalue');
-
-        % Do not filter...
-        % fs = 1/median(diff(seconds(actuator_motors.Time)));
-        % if ~isempty(obj.CutoffFrequency) && (floor(fs) > 2*obj.CutoffFrequency)
-        %     Wn = 2*obj.CutoffFrequency/fs; % fraction of the Nyquist rate
-        %     [num,den] = butter(5,Wn); % 5th order lowpass filter
-        %     idx = ~isnan(actuator_motors.control);
-        %     actuator_motors.control(idx,:) = filtfilt(num,den,actuator_motors.control(idx,:));
-        % end
 
         % Re-time and add data to timetable
         actuator_motors = retime(actuator_motors,obj.Data.Time,...
@@ -594,21 +603,16 @@ methods(Access = private)
         actuator_servos = timetable(actuator_servos.timestamp_sample,...
             actuator_servos.control,'VariableNames',{'control'});
 
-        % Remove columns of NaN
-        idx = all(isnan(actuator_servos.control));
-        actuator_servos.control(:,idx) = [];
+        % Remove (TODO: trailing) columns of NaN
+        % idx = all(isnan(actuator_servos.control));
+        % actuator_servos.control(:,idx) = [];
 
-        % Remove duplicate times
+        % Sort by row times since timestamp_sample may be out of order
+        actuator_servos = sortrows(actuator_servos);
+
+        % Remove duplicate times by keeping the first occurrence
         uniqueTimes = unique(actuator_servos.Time);
         actuator_servos = retime(actuator_servos,uniqueTimes,'firstvalue');
-
-        % Do not filter...
-        % fs = 1/median(diff(seconds(actuator_servos.Time)));
-        % if ~isempty(obj.CutoffFrequency) && (floor(fs) > 2*obj.CutoffFrequency)
-        %     Wn = 2*obj.CutoffFrequency/fs; % fraction of the Nyquist rate
-        %     [num,den] = butter(5,Wn); % 5th order lowpass filter
-        %     actuator_servos.control = filtfilt(num,den,actuator_servos.control);
-        % end
 
         % Re-time and add data to timetable
         actuator_servos = retime(actuator_servos,obj.Data.Time,...
@@ -993,6 +997,20 @@ methods(Access = private)
             {'pos_horiz_accuracy','pos_vert_accuracy'});
 
     end % EstimatorStatus
+
+    function VehicleControlMode(obj,ulog)
+
+        if ~any(strcmp(obj.AvailableMessages,'vehicle_control_mode'))
+            return
+        end
+
+        % Read topic messages
+        vehicle_control_mode = readTopicMsgs(ulog,"TopicNames","vehicle_control_mode").TopicMessages{1};
+
+        % Add to debugging struct
+        obj.Debug.VehicleControlMode = vehicle_control_mode;
+
+    end % VehicleControlMode
 
     function Airdata(obj,ulog)
 
